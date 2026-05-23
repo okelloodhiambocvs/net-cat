@@ -35,11 +35,10 @@ func (s *Server) Start() error {
 			continue
 		}
 
-		go s.handleClient(conn) // GOROUTINE (IMPORTANT)
+		go s.handleClient(conn)
 	}
 }
 
-		
 func (s *Server) handleClient(conn net.Conn) {
 	defer conn.Close()
 
@@ -56,7 +55,7 @@ func (s *Server) handleClient(conn net.Conn) {
 
 	// Reject empty name
 	if name == "" {
-		conn.Write([]byte("Name cannot be empty. Disconnecting...\n"))
+		conn.Write([]byte("Invalid name. Disconnecting...\n"))
 		return
 	}
 
@@ -68,14 +67,16 @@ func (s *Server) handleClient(conn net.Conn) {
 	// Add to hub
 	s.hub.AddClient(client)
 
-	fmt.Println(name, "joined the chat")
+	// SYSTEM JOIN MESSAGE
+	s.hub.SystemMessage(fmt.Sprintf("%s has joined our chat.", name))
 
 	// Keep connection alive (message loop placeholder)
+	// Message loop
 	for {
 		message, err := reader.ReadString('\n')
 		if err != nil {
 			s.hub.RemoveClient(conn)
-			fmt.Println(name, "left the chat")
+			s.hub.SystemMessage(fmt.Sprintf("%s has left our chat.", name))
 			return
 		}
 
@@ -86,7 +87,7 @@ func (s *Server) handleClient(conn net.Conn) {
 			continue
 		}
 
-		// For now we just print server-side
-		fmt.Printf("[%s]: %s\n", name, msg)
+		// BROADCAST to others
+		s.hub.Broadcast(conn, msg)
 	}
 }
