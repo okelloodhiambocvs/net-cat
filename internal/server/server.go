@@ -28,6 +28,8 @@ func (s *Server) Start() error {
 	}
 	defer listener.Close()
 
+	fmt.Printf("Listening on the port :%s\n", s.port)
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -42,14 +44,19 @@ func (s *Server) Start() error {
 func (s *Server) handleClient(conn net.Conn) {
 	defer conn.Close()
 
-	// Ask for name
+	reader := bufio.NewReader(conn)
+
+	// Welcome message
 	conn.Write([]byte("Welcome to TCP-Chat!\n"))
 	conn.Write([]byte("         _nnnn_\n"))
 	conn.Write([]byte("        dGGGGMMb\n"))
 	conn.Write([]byte("[ENTER YOUR NAME]: "))
 
-	reader := bufio.NewReader(conn)
-	nameRaw, _ := reader.ReadString('\n')
+	// Read name ONCE
+	nameRaw, err := reader.ReadString('\n')
+	if err != nil {
+		return
+	}
 
 	name := strings.TrimSpace(nameRaw)
 
@@ -64,16 +71,17 @@ func (s *Server) handleClient(conn net.Conn) {
 		Name: name,
 	}
 
-	// Add to hub
+	// Add client FIRST
 	s.hub.AddClient(client)
 
-	// SYSTEM JOIN MESSAGE
+	// THEN broadcast join (ONLY ONCE)
 	s.hub.SystemMessage(fmt.Sprintf("%s has joined our chat.", name))
 
-	// Keep connection alive (message loop placeholder)
 	// Message loop
 	for {
 		message, err := reader.ReadString('\n')
+
+		// REAL DISCONNECT ONLY
 		if err != nil {
 			s.hub.RemoveClient(conn)
 			s.hub.SystemMessage(fmt.Sprintf("%s has left our chat.", name))
@@ -82,12 +90,11 @@ func (s *Server) handleClient(conn net.Conn) {
 
 		msg := strings.TrimSpace(message)
 
-		// ignore empty messages (REQUIREMENT)
+		// ignore empty messages
 		if msg == "" {
 			continue
 		}
 
-		// BROADCAST to others
 		s.hub.Broadcast(conn, msg)
 	}
 }
